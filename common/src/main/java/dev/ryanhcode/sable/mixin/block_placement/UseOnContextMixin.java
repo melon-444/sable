@@ -10,6 +10,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -45,6 +46,48 @@ public abstract class UseOnContextMixin {
                 && localEntity.sable$isAlreadyLocalTo(targetSubLevel);
     }
 
+    @Inject(
+            method = "getClickedFace",
+            at = @At("HEAD"),
+            cancellable = true
+    )
+    private void sable$getClickedFace(
+            final CallbackInfoReturnable<Direction> cir
+    ) {
+        if (this.player == null)
+            return;
+
+        final SubLevel targetSubLevel =
+                Sable.HELPER.getContaining(
+                        this.level,
+                        this.getClickedPos()
+                );
+
+        if (targetSubLevel == null)
+            return;
+
+        /*
+         * Create has already expressed the DeployerFakePlayer's look direction
+         * in the target SubLevel's local coordinate system.
+         */
+        if (!this.sable$isAlreadyTargetLocal(targetSubLevel))
+            return;
+
+        final Vec3 localLook = this.player.getLookAngle();
+
+        /*
+         * The deployer looks along the ray toward the target. The clicked surface
+         * normal therefore points in the opposite direction.
+         */
+        final Direction localClickedFace =
+                Direction.getNearest(
+                        localLook.x,
+                        localLook.y,
+                        localLook.z
+                ).getOpposite();
+
+        cir.setReturnValue(localClickedFace);
+    }
 
     @Inject(method = "getHorizontalDirection", at = @At("HEAD"), cancellable = true)
     private void sable$getHorizontalDirection(final CallbackInfoReturnable<Direction> cir) {
